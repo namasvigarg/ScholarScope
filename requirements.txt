@@ -1,9 +1,27 @@
-streamlit
-PyMuPDF
-python-dotenv
-requests
+# Web app
+streamlit>=1.24.1
+
+# PDF processing
+PyMuPDF>=1.22.5
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# HTTP requests
+requests>=2.31.0
+
+# LangChain for embeddings, text splitting, and RAG
 langchain>=0.1.85
-langchain-community
-faiss-cpu
-sentence-transformers
-huggingface-hub
+langchain-community>=0.0.230
+
+# Vector database
+faiss-cpu>=1.7.4
+
+# HuggingFace embeddings
+sentence-transformers>=2.2.2
+huggingface-hub>=0.17.4
+
+# Optional: utilities
+tqdm>=4.65.0
+
+
