@@ -4,23 +4,28 @@ import os
 import re
 import requests
 from dotenv import load_dotenv
-from langchain.text_splitters import RecursiveCharacterTextSplitter  # fixed import
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
+
 
 # Load environment variables
 load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
+
 st.set_page_config(page_title="AI Paper Summarizer & QnA", layout="wide")
 st.title("\U0001F4D8 AI Research Paper Assistant")
+
 
 # === File Upload & Initialization ===
 uploaded_files = st.file_uploader("Upload one or more PDFs", type="pdf", accept_multiple_files=True)
 
+
 if "uploaded_files_data" not in st.session_state:
     st.session_state.uploaded_files_data = {}
     st.session_state.ready_to_process = False
+
 
 if uploaded_files:
     for file in uploaded_files:
@@ -43,13 +48,16 @@ if uploaded_files:
             except Exception as e:
                 st.error(f"Failed to load {file.name}: {e}")
 
+
     if st.button("➡️ Next"):
         st.session_state.ready_to_process = True
+
 
 # === Utilities ===
 def get_summary_stats(text, num_pages):
     word_count = len(text.split())
     return {"Pages": num_pages, "Words": word_count, "Reading Time (min)": round(word_count / 200)}
+
 
 def chunk_text(text, max_tokens=1000):
     paragraphs = text.split('\n\n')
@@ -63,14 +71,15 @@ def chunk_text(text, max_tokens=1000):
     chunks.append(chunk)
     return chunks
 
+
 def chunk_text_by_page(doc):
     chunks, metadatas = [], []
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     for i, page in enumerate(doc):
-        page_chunks = splitter.split_text(page.get_text())
+        page_chunks = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200).split_text(page.get_text())
         chunks.extend(page_chunks)
         metadatas.extend([{"page": i + 1}] * len(page_chunks))
     return chunks, metadatas
+
 
 def query_cypheralpha(prompt):
     headers = {
@@ -91,9 +100,11 @@ def query_cypheralpha(prompt):
     except:
         return f"Error: 'choices' Response: {res.text}"
 
+
 # === Tabs ===
 if st.session_state.ready_to_process:
     tabs = st.tabs(["\U0001F9E0 Summary", "\U0001F4AC Ask Questions", "\U0001F4C4 View Chunks"])
+
 
     # === SUMMARY TAB ===
     with tabs[0]:
@@ -112,6 +123,7 @@ if st.session_state.ready_to_process:
                 st.markdown(data["summary"])
                 st.download_button("Download Summary", data=data["summary"], file_name=f"{name}_summary.txt")
 
+
         if len(all_summaries) > 1:
             st.subheader("\U0001F9D0 Compare Summaries")
             cols = st.columns(len(all_summaries))
@@ -125,14 +137,17 @@ if st.session_state.ready_to_process:
                     cmp = query_cypheralpha(cmp_prompt)
                     st.session_state.comparison_summary = cmp
 
+
             st.markdown(st.session_state.comparison_summary)
             st.download_button("Download Comparison", data=st.session_state.comparison_summary, file_name="comparison_summary.txt")
+
 
     # === QNA TAB ===
     with tabs[1]:
         st.subheader("🧠 Ask Questions about a Specific Paper")
         selected_pdf = st.selectbox("Select a PDF to query", list(st.session_state.uploaded_files_data.keys()))
         selected_data = st.session_state.uploaded_files_data[selected_pdf]
+
 
         col1, col2 = st.columns([1.5, 1])
         with col1:
@@ -148,9 +163,11 @@ if st.session_state.ready_to_process:
                         "qa_metadatas": metadatas
                     })
 
+
             with st.form(key=f"qa_form_{selected_pdf}"):
                 user_input = st.text_input("Your question:", key=f"qa_input_{selected_pdf}")
                 submit_btn = st.form_submit_button("Submit")
+
 
             if submit_btn and user_input:
                 with st.spinner("Thinking..."):
@@ -162,17 +179,21 @@ if st.session_state.ready_to_process:
                         labeled_chunks.append((cid, doc))
                         context += f"{cid}\n{doc.page_content.strip()}\n\n"
 
+
                     prompt = f"Answer based on CHUNKs if needed:\n\n{context}\n\nQ: {user_input}\n\nAnswer and list CHUNKs used."
                     answer = query_cypheralpha(prompt)
+
 
                     used_chunks = re.findall(r"CHUNK\s*(\d+)", answer.upper())
                     unique_refs = sorted(set(int(i) for i in used_chunks if i.isdigit()))
                     context_docs = [labeled_chunks[i-1][1] for i in unique_refs if i-1 < len(labeled_chunks)]
 
+
                     selected_data["chat_history"].append(("You", user_input))
                     selected_data["chat_history"].append(("AI", answer))
                     selected_data["chunk_refs"] = {f"chunk_{i}": doc.metadata["page"] for i, doc in enumerate(context_docs)}
                     selected_data["chunk_objects"] = {f"chunk_{i}": doc for i, doc in enumerate(context_docs)}
+
 
             if selected_data["chat_history"]:
                 st.markdown("### 💬 Latest Answer")
@@ -183,14 +204,17 @@ if st.session_state.ready_to_process:
                         st.session_state.selected_page_num = page
                         st.session_state.selected_pdf_for_viewer = selected_pdf
 
+
             st.markdown("---")
             st.markdown("### 🗂 Chat History")
             for role, msg in selected_data["chat_history"][:-1]:
                 st.markdown(f"**{role}:** {msg}")
 
+
         with col2:
             st.subheader("ℹ️ Tip")
             st.info("Use the dropdown to select a paper. Click 'View Chunk' to inspect its matching page and content.")
+
 
     # === CHUNK VIEWER TAB ===
     with tabs[2]:
@@ -198,7 +222,8 @@ if st.session_state.ready_to_process:
         if st.session_state.get("selected_chunk_text") and st.session_state.get("selected_page_num"):
             selected_pdf_name = st.session_state.get("selected_pdf_for_viewer")
             selected_page = st.session_state.selected_page_num
-            chunk_text_val = st.session_state.selected_chunk_text
+            chunk_text = st.session_state.selected_chunk_text
+
 
             if selected_pdf_name in st.session_state.uploaded_files_data:
                 doc = st.session_state.uploaded_files_data[selected_pdf_name]["doc"]
@@ -207,8 +232,10 @@ if st.session_state.ready_to_process:
                 img_bytes = pix.tobytes("png")
                 st.image(img_bytes, caption=f"Page {selected_page}", use_container_width=True)
                 st.markdown("#### 📌 Matched Text:")
-                st.text_area("", value=chunk_text_val, height=300)
+                st.text_area("", value=chunk_text, height=300)
             else:
                 st.error("PDF not found in session state.")
         else:
             st.info("Use the Q&A tab to select a chunk to view.")
+
+
