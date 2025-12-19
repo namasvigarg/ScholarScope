@@ -21,7 +21,6 @@ faiss-cpu>=1.7.4
 sentence-transformers>=2.2.2
 huggingface-hub>=0.17.4
 
-# Optional: utilities
+# Optional utilities
 tqdm>=4.65.0
-
 
